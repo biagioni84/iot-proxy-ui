@@ -35,8 +35,7 @@ jobs:
           username: ${{ vars.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
-            rm -rf /home/ubuntu/ui-dist
-            mkdir -p /home/ubuntu/ui-dist
+            find /var/www/app.plomo.uy -mindepth 1 -delete
 
       - name: Upload build to server
         uses: appleboy/scp-action@v0.1.7
@@ -45,5 +44,5 @@ jobs:
           username: ${{ vars.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           source: "dist/*"
-          target: "/home/ubuntu/ui-dist"
+          target: "/var/www/app.plomo.uy"
           strip_components: 1
