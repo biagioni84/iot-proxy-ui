@@ -16,11 +16,10 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import CloseIcon from '@mui/icons-material/Close';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckIcon from '@mui/icons-material/Check';
-import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { LoginContext } from '../App';
 import { renameDevice, deleteDevice, reinterviewDevice } from './gatewayApi';
@@ -39,13 +38,13 @@ function Controls({ gwId, device }) {
     default:
       return (
         <Typography variant="body2" color="text.secondary">
-          No controls available for type "{device.type}".
+          No additional controls for type "{device.type}".
         </Typography>
       );
   }
 }
 
-export default function DeviceDetail({ gwId, device, onBack }) {
+export default function DeviceDetail({ gwId, device, onClose }) {
   const [, setLoggedIn] = useContext(LoginContext);
   const queryClient = useQueryClient();
 
@@ -69,7 +68,7 @@ export default function DeviceDetail({ gwId, device, onBack }) {
     mutationFn: () => deleteDevice(gwId, device.id, setLoggedIn),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gatewaySummary', gwId] });
-      onBack();
+      onClose();
     },
   });
 
@@ -86,10 +85,6 @@ export default function DeviceDetail({ gwId, device, onBack }) {
     <Box>
       {/* Header */}
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-        <IconButton onClick={onBack} size="small">
-          <ArrowBackIcon />
-        </IconButton>
-
         {editingName ? (
           <>
             <TextField
@@ -132,16 +127,21 @@ export default function DeviceDetail({ gwId, device, onBack }) {
                 <DeleteIcon fontSize="small" />
               </IconButton>
             </Tooltip>
+            <Tooltip title="Close">
+              <IconButton size="small" onClick={onClose}>
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </>
         )}
       </Stack>
 
       {renameMutation.error && (
-        <Alert severity="error" sx={{ mb: 1, ml: 5 }}>{renameMutation.error.message}</Alert>
+        <Alert severity="error" sx={{ mb: 1 }}>{renameMutation.error.message}</Alert>
       )}
 
       {/* Meta chips */}
-      <Stack direction="row" spacing={1} sx={{ mb: 1, pl: 5 }}>
+      <Stack direction="row" spacing={1} sx={{ mb: 1 }} flexWrap="wrap" useFlexGap>
         <Chip label={device.type} size="small" variant="outlined" />
         <Chip label={device.protocol} size="small" variant="outlined" />
         {device.manufacturer && (
@@ -150,7 +150,7 @@ export default function DeviceDetail({ gwId, device, onBack }) {
       </Stack>
 
       {device.modelId && (
-        <Typography variant="caption" color="text.secondary" sx={{ pl: 5, display: 'block', mb: 2 }}>
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
           {device.modelId}
         </Typography>
       )}
@@ -158,29 +158,21 @@ export default function DeviceDetail({ gwId, device, onBack }) {
       <Divider sx={{ mb: 3 }} />
 
       {/* Controls */}
-      <Box sx={{ pl: 1 }}>
-        <Controls gwId={gwId} device={device} />
-      </Box>
+      <Controls gwId={gwId} device={device} />
 
       {/* Z-Wave operations */}
       {device.protocol === 'zwave' && (
         <>
           <Divider sx={{ my: 3 }} />
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Button
-              variant="text"
-              size="small"
-              startIcon={
-                reinterviewMutation.isPending
-                  ? <CircularProgress size={14} />
-                  : <RefreshIcon />
-              }
-              onClick={() => reinterviewMutation.mutate()}
-              disabled={reinterviewMutation.isPending}
-            >
-              Re-interview device
-            </Button>
-          </Stack>
+          <Button
+            variant="text"
+            size="small"
+            startIcon={reinterviewMutation.isPending ? <CircularProgress size={14} /> : <RefreshIcon />}
+            onClick={() => reinterviewMutation.mutate()}
+            disabled={reinterviewMutation.isPending}
+          >
+            Re-interview device
+          </Button>
           {reinterviewMutation.error && (
             <Alert severity="error" sx={{ mt: 1 }}>{reinterviewMutation.error.message}</Alert>
           )}

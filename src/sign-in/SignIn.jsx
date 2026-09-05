@@ -11,6 +11,7 @@ import FormControl from '@mui/material/FormControl';
 // import Link from '@mui/material/Link'; // used by ForgotPassword link
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import MuiCard from '@mui/material/Card';
 import { styled } from '@mui/material/styles';
@@ -77,6 +78,7 @@ export default function SignIn(props) {
   const [emailErrorMessage, setEmailErrorMessage] = useState('');
   const [passwordError, setPasswordError] = useState(false);
   const [passwordErrorMessage, setPasswordErrorMessage] = useState('');
+  const [loginError, setLoginError] = useState('');
   // TODO: implement forgot password
   // const [open, setOpen] = useState(false);
   // const handleClickOpen = () => { setOpen(true); };
@@ -92,6 +94,7 @@ export default function SignIn(props) {
     }
     const email = emailRef.current;
     const password = passwordRef.current;
+    setLoginError('');
     try {
       const response = await fetch(baseUrl + 'auth/login', {
         method: 'POST',
@@ -101,8 +104,14 @@ export default function SignIn(props) {
         body: JSON.stringify({username: email.value, password:password.value})
       });
 
+      if (response.status === 401 || response.status === 403) {
+        setLoginError('Invalid email or password.');
+        return;
+      }
+
       if (!response.ok) {
-        throw new Error('Something went wrong');
+        setLoginError('Something went wrong. Please try again later.');
+        return;
       }
 
       const result = await response.json();
@@ -114,7 +123,7 @@ export default function SignIn(props) {
               : '/dashboard'
       );
     } catch (error) {
-      setLoggedIn(false);
+      setLoginError('Could not reach the server. Check your connection.');
     }
   };
 
@@ -211,6 +220,7 @@ export default function SignIn(props) {
             />
             {/* TODO: implement forgot password */}
             {/* <ForgotPassword open={open} handleClose={handleClose} /> */}
+            {loginError && <Alert severity="error">{loginError}</Alert>}
             <Button
               type="submit"
               fullWidth
