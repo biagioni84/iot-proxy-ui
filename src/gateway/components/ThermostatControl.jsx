@@ -12,9 +12,10 @@ import FormControl from '@mui/material/FormControl';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
-import Chip from '@mui/material/Chip';
 import { LoginContext } from '../../App';
 import { deviceGet, devicePost } from '../gatewayApi';
+import EntityRow from './EntityRow';
+import { thermostatVisual } from './deviceVisuals';
 
 const MODES = ['heat', 'cool', 'auto', 'off'];
 
@@ -46,10 +47,22 @@ export default function ThermostatControl({ gwId, device }) {
   if (isPending) return <CircularProgress size={24} />;
   if (error) return <Alert severity="error">{error.message}</Alert>;
 
+  const thermo = thermostatVisual(state?.mode);
+  const setpoints = [
+    state?.heat != null ? `Heat ${state.heat}°` : null,
+    state?.cool != null ? `Cool ${state.cool}°` : null,
+  ].filter(Boolean).join(' · ');
+
   return (
     <Box>
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 3 }}>
-        <Chip label={`Mode: ${state?.mode ?? '—'}`} color="primary" variant="outlined" />
+      <Stack sx={{ mb: 3 }}>
+        <EntityRow
+          icon={thermo.icon}
+          iconColor={thermo.color}
+          label="Thermostat"
+          value={state?.mode ? state.mode.charAt(0).toUpperCase() + state.mode.slice(1) : '—'}
+          subtitle={setpoints || undefined}
+        />
       </Stack>
 
       <FormControl size="small" sx={{ mb: 3, minWidth: 160 }}>

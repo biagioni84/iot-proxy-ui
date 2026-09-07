@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import LockIcon from '@mui/icons-material/Lock';
@@ -13,6 +12,8 @@ import Divider from '@mui/material/Divider';
 import { LoginContext } from '../../App';
 import { deviceGet, devicePost } from '../gatewayApi';
 import PincodesPanel from './PincodesPanel';
+import EntityRow from './EntityRow';
+import { lockVisual, batteryVisual } from './deviceVisuals';
 
 export default function LockControl({ gwId, device }) {
   const [, setLoggedIn] = useContext(LoginContext);
@@ -31,23 +32,22 @@ export default function LockControl({ gwId, device }) {
 
   const status = lockState?.value ?? device.status;
   const isLocked = status === 'locked';
+  const lock = lockVisual(status);
+  const battery = batteryVisual(device.battery);
 
   return (
     <Box>
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 3 }}>
+      <Stack sx={{ mb: 2 }}>
         {isPending ? (
           <CircularProgress size={20} />
         ) : (
-          <Chip
-            icon={isLocked ? <LockIcon /> : <LockOpenIcon />}
-            label={status ?? 'unknown'}
-            color={isLocked ? 'success' : 'default'}
-          />
+          <EntityRow icon={lock.icon} iconColor={lock.color} label="Lock" value={lock.label} />
         )}
-        {device.battery !== null && device.battery !== undefined && (
-          <Chip label={`${device.battery}%`} variant="outlined" size="small" />
+        {battery && (
+          <EntityRow icon={battery.icon} iconColor={battery.color} label="Battery" value={`${device.battery}%`} />
         )}
       </Stack>
+      <Divider sx={{ mb: 2 }} />
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error.message}</Alert>}
       {mutation.error && <Alert severity="error" sx={{ mb: 2 }}>{mutation.error.message}</Alert>}
