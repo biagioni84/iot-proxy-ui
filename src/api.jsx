@@ -72,6 +72,19 @@ export async function sendDeleteTunnel(data, setLoggedIn) {
   return parseResponse(response);
 }
 
+export async function createGateway(data, setLoggedIn) {
+  const response = await fetch(`${baseUrl}api/v1/gateways`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ gatewayId: data.gatewayId, publicKey: data.publicKey }),
+  });
+  if (response.status === 409) {
+    throw new Error('A gateway with that ID already exists.');
+  }
+  handleResponse(response, setLoggedIn);
+  return parseResponse(response);
+}
+
 export async function proxyRequest({ gwId, path, method, body, setLoggedIn, signal }) {
   const url = `${baseUrl}api/v1/${gwId}/proxy/${path}`;
   const response = await fetch(url, {

@@ -1,18 +1,49 @@
 import * as React from 'react';
 import { DataGrid, GridActionsCellItem, gridClasses } from '@mui/x-data-grid';
 import Chip from '@mui/material/Chip';
-import { useContext } from 'react';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
+import Grid from '@mui/material/Grid';
+import { useContext, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { LoginContext } from '../../App';
+import { createGateway } from '../../api';
+import AddGateway from './AddGateway';
 import InfoIcon from '@mui/icons-material/Info';
 import DisplaySettingsIcon from '@mui/icons-material/DisplaySettings';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SettingsIcon from '@mui/icons-material/Settings';
+import AddIcon from '@mui/icons-material/Add';
 
 export default function GatewaysList(props) {
     const [loggedIn, setLoggedIn] = useContext(LoginContext);
+    const [addOpen, setAddOpen] = useState(false);
+    const queryClient = useQueryClient();
     const handleAction = (row) => {
         console.log(row.key)
     }
+
+    const createGatewayMutation = useMutation({
+        mutationFn: (data) => createGateway(data, setLoggedIn),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['userData'] });
+            setAddOpen(false);
+        },
+    });
+
+    const handleAddOpen = () => {
+        createGatewayMutation.reset();
+        setAddOpen(true);
+    };
+    const handleAddClose = () => {
+        setAddOpen(false);
+        createGatewayMutation.reset();
+    };
+    const handleAddSubmit = (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        createGatewayMutation.mutate(Object.fromEntries(formData.entries()));
+    };
     function renderStatus(status) {
         const colors = {
             Online: 'success',
@@ -132,9 +163,25 @@ export default function GatewaysList(props) {
 
 
     return (
-
+        <>
+        <Grid
+            container
+            direction="row"
+            sx={{
+                justifyContent: 'space-between',
+                alignItems: 'flex-end',
+                mb: 1,
+            }}
+        >
+            <Typography component="h2" variant="h6">
+                Gateways
+            </Typography>
+            <Button onClick={handleAddOpen}>
+                <AddIcon />
+            </Button>
+        </Grid>
         <DataGrid
-        
+
             // checkboxSelection
             disableRowSelectionOnClick
             // showToolbar
@@ -198,5 +245,13 @@ export default function GatewaysList(props) {
                 },
             }}
         />
+        <AddGateway
+            open={addOpen}
+            onClose={handleAddClose}
+            onSubmit={handleAddSubmit}
+            isPending={createGatewayMutation.isPending}
+            errorMessage={createGatewayMutation.error?.message}
+        />
+        </>
     );
 }
