@@ -7,67 +7,24 @@ import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 import Chip from '@mui/material/Chip';
 import Button from '@mui/material/Button';
-import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import CircularProgress from '@mui/material/CircularProgress';
 import Tooltip from '@mui/material/Tooltip';
-import LockIcon from '@mui/icons-material/Lock';
-import LockOpenIcon from '@mui/icons-material/LockOpen';
 import { LoginContext } from '../../App';
 import { deviceGet, devicePost } from '../gatewayApi';
+import EntityRow from './EntityRow';
+import { lockVisual, switchVisual, thermostatVisual } from './deviceVisuals';
 
 const stopProp = (e) => e.stopPropagation();
 
-// ── Lock ─────────────────────────────────────────────────────────────────────
-function LockQuickActions({ gwId, device }) {
-  const [, setLoggedIn] = useContext(LoginContext);
-  const queryClient = useQueryClient();
-  const [status, setStatus] = useState(device.status);
-
-  const mutation = useMutation({
-    mutationFn: (value) => devicePost(gwId, device.id, 'lock', { value }, setLoggedIn),
-    onSuccess: (_, value) => {
-      setStatus(value === 'lock' ? 'locked' : 'unlocked');
-      queryClient.invalidateQueries({ queryKey: ['gatewaySummary', gwId] });
-    },
-  });
-
-  const isLocked = status === 'locked';
-
-  return (
-    <Stack spacing={1} onClick={stopProp}>
-      <Chip
-        icon={isLocked ? <LockIcon fontSize="small" /> : <LockOpenIcon fontSize="small" />}
-        label={status ?? 'unknown'}
-        color={isLocked ? 'success' : 'default'}
-        size="small"
-        sx={{ alignSelf: 'flex-start' }}
-      />
-      <Stack direction="row" spacing={1} alignItems="center">
-        <Button size="small" variant="contained"
-          startIcon={<LockIcon />}
-          onClick={() => mutation.mutate('lock')}
-          disabled={mutation.isPending || isLocked}
-        >
-          Lock
-        </Button>
-        <Button size="small" variant="outlined"
-          startIcon={<LockOpenIcon />}
-          onClick={() => mutation.mutate('unlock')}
-          disabled={mutation.isPending || status === 'unlocked'}
-        >
-          Unlock
-        </Button>
-        {mutation.isPending && <CircularProgress size={16} />}
-      </Stack>
-    </Stack>
-  );
+// ── Lock (read-only — lock/unlock happens in the detail modal) ────────────────
+function LockStatusRow({ device }) {
+  const { icon, color, label } = lockVisual(device.status);
+  return <EntityRow icon={icon} iconColor={color} label="Lock" value={label} />;
 }
 
-// ── Switch ────────────────────────────────────────────────────────────────────
-function SwitchQuickActions({ gwId, device }) {
+// ── Switch ──────────────────────────────────────────────────────────────────
+function SwitchStatusRow({ gwId, device }) {
   const [, setLoggedIn] = useContext(LoginContext);
   const queryClient = useQueryClient();
   const [isOn, setIsOn] = useState(device.status === 'on');
@@ -80,73 +37,53 @@ function SwitchQuickActions({ gwId, device }) {
     },
   });
 
+  const { icon, color } = switchVisual(isOn);
+
   return (
-    <Stack direction="row" alignItems="center" spacing={1} onClick={stopProp}>
-      <FormControlLabel
-        control={
+    <EntityRow
+      icon={icon}
+      iconColor={color}
+      label="Switch"
+      control={
+        mutation.isPending ? (
+          <CircularProgress size={18} />
+        ) : (
           <Switch
             checked={isOn}
             onChange={(e) => mutation.mutate(e.target.checked ? 'on' : 'off')}
-            disabled={mutation.isPending}
             size="small"
           />
-        }
-        label={isOn ? 'On' : 'Off'}
-        sx={{ m: 0 }}
-      />
-      {mutation.isPending && <CircularProgress size={16} />}
-    </Stack>
+        )
+      }
+    />
   );
 }
 
-// ── Thermostat ────────────────────────────────────────────────────────────────
-const THERMO_MODES = ['heat', 'cool', 'auto', 'off'];
-
-function ThermostatQuickActions({ gwId, device }) {
+// ── Thermostat (read-only — mode/setpoints change in the detail modal) ────────
+function ThermostatStatusRow({ gwId, device }) {
   const [, setLoggedIn] = useContext(LoginContext);
-  const queryClient = useQueryClient();
-  const qKey = ['device', gwId, device.id, 'thermostat'];
-
   const { data: state } = useQuery({
-    queryKey: qKey,
+    queryKey: ['device', gwId, device.id, 'thermostat'],
     queryFn: () => deviceGet(gwId, device.id, 'thermostat', setLoggedIn),
     retry: false,
   });
 
-  const mutation = useMutation({
-    mutationFn: (body) => devicePost(gwId, device.id, 'thermostat', body, setLoggedIn),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: qKey }),
-  });
-
   const mode = state?.mode ?? null;
+  const { icon, color } = thermostatVisual(mode);
+
+  const setpoints = [
+    state?.heat != null ? `${state.heat}°` : null,
+    state?.cool != null ? `${state.cool}°` : null,
+  ].filter(Boolean).join(' / ');
 
   return (
-    <Stack spacing={1} onClick={stopProp}>
-      <Stack direction="row" spacing={0.5}>
-        {state?.heat != null && (
-          <Chip label={`↑ ${state.heat}°`} size="small" color="error" variant="outlined" />
-        )}
-        {state?.cool != null && (
-          <Chip label={`↓ ${state.cool}°`} size="small" color="info" variant="outlined" />
-        )}
-        {state == null && (
-          <Chip label="—" size="small" variant="outlined" />
-        )}
-      </Stack>
-      <ToggleButtonGroup
-        value={mode}
-        exclusive
-        onChange={(_, v) => v && mutation.mutate({ mode: v })}
-        size="small"
-        disabled={mutation.isPending}
-      >
-        {THERMO_MODES.map((m) => (
-          <ToggleButton key={m} value={m} sx={{ px: 1, py: 0.25, fontSize: 11, minWidth: 42 }}>
-            {m}
-          </ToggleButton>
-        ))}
-      </ToggleButtonGroup>
-    </Stack>
+    <EntityRow
+      icon={icon}
+      iconColor={color}
+      label="Thermostat"
+      value={mode ? mode.charAt(0).toUpperCase() + mode.slice(1) : '—'}
+      subtitle={setpoints || undefined}
+    />
   );
 }
 
@@ -174,11 +111,11 @@ function SensorQuickActions({ device }) {
 }
 
 // ── Dispatcher ────────────────────────────────────────────────────────────────
-function QuickActions({ gwId, device }) {
+function StatusRow({ gwId, device }) {
   switch (device.type) {
-    case 'lock':       return <LockQuickActions gwId={gwId} device={device} />;
-    case 'switch':     return <SwitchQuickActions gwId={gwId} device={device} />;
-    case 'thermostat': return <ThermostatQuickActions gwId={gwId} device={device} />;
+    case 'lock':       return <LockStatusRow device={device} />;
+    case 'switch':     return <SwitchStatusRow gwId={gwId} device={device} />;
+    case 'thermostat': return <ThermostatStatusRow gwId={gwId} device={device} />;
     default:           return <SensorQuickActions device={device} />;
   }
 }
@@ -189,12 +126,17 @@ export default function DeviceCard({ gwId, device, onOpenModal }) {
 
   return (
     <Card
-      variant="outlined"
       onClick={() => onOpenModal(device)}
-      sx={{ cursor: 'pointer', height: '100%', '&:hover': { boxShadow: 3 } }}
+      sx={{
+        cursor: 'pointer',
+        height: '100%',
+        borderRadius: 3,
+        boxShadow: 1,
+        '&:hover': { boxShadow: 4 },
+      }}
     >
       <CardContent>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 0.5 }}>
           <Typography variant="subtitle2" noWrap sx={{ maxWidth: '75%' }}>
             {displayName}
           </Typography>
@@ -207,7 +149,7 @@ export default function DeviceCard({ gwId, device, onOpenModal }) {
             />
           )}
         </Stack>
-        <QuickActions gwId={gwId} device={device} />
+        <StatusRow gwId={gwId} device={device} />
       </CardContent>
     </Card>
   );

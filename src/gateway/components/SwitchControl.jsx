@@ -3,9 +3,7 @@ import { useContext } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
-import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
-import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import Divider from '@mui/material/Divider';
@@ -13,6 +11,8 @@ import Typography from '@mui/material/Typography';
 import Slider from '@mui/material/Slider';
 import { LoginContext } from '../../App';
 import { deviceGet, devicePost } from '../gatewayApi';
+import EntityRow from './EntityRow';
+import { switchVisual, batteryVisual } from './deviceVisuals';
 
 function DimmerSection({ gwId, device, setLoggedIn }) {
   const queryClient = useQueryClient();
@@ -72,28 +72,34 @@ export default function SwitchControl({ gwId, device }) {
   });
 
   const isOn = (switchState?.value ?? device.status) === 'on';
+  const sw = switchVisual(isOn);
+  const battery = batteryVisual(device.battery);
 
   return (
     <Box>
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+      <Stack sx={{ mb: 2 }}>
         {isPending ? (
           <CircularProgress size={20} />
         ) : (
-          <FormControlLabel
+          <EntityRow
+            icon={sw.icon}
+            iconColor={sw.color}
+            label="Switch"
             control={
-              <Switch
-                checked={isOn}
-                onChange={(e) => mutation.mutate(e.target.checked ? 'on' : 'off')}
-                disabled={mutation.isPending}
-              />
+              mutation.isPending ? (
+                <CircularProgress size={20} />
+              ) : (
+                <Switch
+                  checked={isOn}
+                  onChange={(e) => mutation.mutate(e.target.checked ? 'on' : 'off')}
+                />
+              )
             }
-            label={isOn ? 'On' : 'Off'}
           />
         )}
-        {device.battery !== null && device.battery !== undefined && (
-          <Chip label={`${device.battery}%`} variant="outlined" size="small" />
+        {battery && (
+          <EntityRow icon={battery.icon} iconColor={battery.color} label="Battery" value={`${device.battery}%`} />
         )}
-        {mutation.isPending && <CircularProgress size={20} />}
       </Stack>
 
       {error && <Alert severity="error">{error.message}</Alert>}
