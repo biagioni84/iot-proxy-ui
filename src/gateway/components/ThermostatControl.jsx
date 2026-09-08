@@ -13,9 +13,10 @@ import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import { LoginContext } from '../../App';
-import { deviceGet, devicePost } from '../gatewayApi';
+import { deviceGet, fetchDeviceSummary, setThermostatMode, setThermostatSetpoint } from '../gatewayApi';
 import EntityRow from './EntityRow';
 import { thermostatVisual } from './deviceVisuals';
+import { isHAv1, getStatus, hasAction } from '../deviceFormat';
 
 const MODES = ['heat', 'cool', 'auto', 'off'];
 
@@ -23,11 +24,24 @@ export default function ThermostatControl({ gwId, device }) {
   const [, setLoggedIn] = useContext(LoginContext);
   const queryClient = useQueryClient();
   const qKey = ['device', gwId, device.id, 'thermostat'];
+  const hav1 = isHAv1(device);
 
-  const { data: state, isPending, error } = useQuery({
+  const { data: liveData, isPending, error } = useQuery({
     queryKey: qKey,
-    queryFn: () => deviceGet(gwId, device.id, 'thermostat', setLoggedIn),
+    queryFn: () => hav1
+      ? fetchDeviceSummary(gwId, device.id, setLoggedIn)
+      : deviceGet(gwId, device.id, 'thermostat', setLoggedIn),
   });
+
+  const state = hav1
+    ? {
+        mode: getStatus(liveData ?? device, 'climate'),
+        heat: getStatus(liveData ?? device, 'heat') ?? getStatus(liveData ?? device, 'temperature'),
+        cool: getStatus(liveData ?? device, 'cool'),
+      }
+    : liveData;
+
+  const canSetMode = hasAction(device, 'set_hvac_mode');
 
   const [heat, setHeat] = useState('');
   const [cool, setCool] = useState('');
@@ -39,8 +53,13 @@ export default function ThermostatControl({ gwId, device }) {
     }
   }, [state]);
 
-  const mutation = useMutation({
-    mutationFn: (body) => devicePost(gwId, device.id, 'thermostat', body, setLoggedIn),
+  const modeMutation = useMutation({
+    mutationFn: (mode) => setThermostatMode(gwId, device, mode, setLoggedIn),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: qKey }),
+  });
+
+  const setpointMutation = useMutation({
+    mutationFn: (body) => setThermostatSetpoint(gwId, device, body, setLoggedIn),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: qKey }),
   });
 
@@ -65,19 +84,21 @@ export default function ThermostatControl({ gwId, device }) {
         />
       </Stack>
 
-      <FormControl size="small" sx={{ mb: 3, minWidth: 160 }}>
-        <InputLabel>Mode</InputLabel>
-        <Select
-          value={state?.mode ?? ''}
-          label="Mode"
-          onChange={(e) => mutation.mutate({ mode: e.target.value })}
-          disabled={mutation.isPending}
-        >
-          {MODES.map((m) => (
-            <MenuItem key={m} value={m}>{m}</MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+      {canSetMode && (
+        <FormControl size="small" sx={{ mb: 3, minWidth: 160 }}>
+          <InputLabel>Mode</InputLabel>
+          <Select
+            value={state?.mode ?? ''}
+            label="Mode"
+            onChange={(e) => modeMutation.mutate(e.target.value)}
+            disabled={modeMutation.isPending}
+          >
+            {MODES.map((m) => (
+              <MenuItem key={m} value={m}>{m}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      )}
 
       <Stack direction="row" spacing={2} alignItems="flex-end">
         <TextField
@@ -92,8 +113,8 @@ export default function ThermostatControl({ gwId, device }) {
         <Button
           variant="outlined"
           size="small"
-          onClick={() => mutation.mutate({ heat: parseFloat(heat) })}
-          disabled={mutation.isPending || heat === ''}
+          onClick={() => setpointMutation.mutate({ heat: parseFloat(heat) })}
+          disabled={setpointMutation.isPending || heat === ''}
         >
           Set
         </Button>
@@ -112,15 +133,21 @@ export default function ThermostatControl({ gwId, device }) {
         <Button
           variant="outlined"
           size="small"
-          onClick={() => mutation.mutate({ cool: parseFloat(cool) })}
-          disabled={mutation.isPending || cool === ''}
+          onClick={() => setpointMutation.mutate({ cool: parseFloat(cool) })}
+          disabled={setpointMutation.isPending || cool === ''}
         >
           Set
         </Button>
       </Stack>
 
-      {mutation.error && <Alert severity="error" sx={{ mt: 2 }}>{mutation.error.message}</Alert>}
-      {mutation.isPending && <CircularProgress size={20} sx={{ mt: 2 }} />}
+      {(modeMutation.error || setpointMutation.error) && (
+        <Alert severity="error" sx={{ mt: 2 }}>
+          {(modeMutation.error ?? setpointMutation.error).message}
+        </Alert>
+      )}
+      {(modeMutation.isPending || setpointMutation.isPending) && (
+        <CircularProgress size={20} sx={{ mt: 2 }} />
+      )}
     </Box>
   );
 }
