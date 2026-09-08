@@ -23,11 +23,19 @@ import CheckIcon from '@mui/icons-material/Check';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { LoginContext } from '../App';
 import { renameDevice, deleteDevice, reinterviewDevice } from './gatewayApi';
+import { isMultiEntity } from './deviceFormat';
 import LockControl from './components/LockControl';
 import SwitchControl from './components/SwitchControl';
 import ThermostatControl from './components/ThermostatControl';
+import EntityGroup from './components/EntityGroup';
 
 function Controls({ gwId, device }) {
+  // A HAv1 device grouping more than one entity of the same kind falls
+  // through to the generic per-entity list — the single-widget controls
+  // below only ever address the first instance.
+  if (isMultiEntity(device)) {
+    return <EntityGroup gwId={gwId} device={device} />;
+  }
   switch (device.type) {
     case 'lock':
       return <LockControl gwId={gwId} device={device} />;
@@ -36,11 +44,7 @@ function Controls({ gwId, device }) {
     case 'thermostat':
       return <ThermostatControl gwId={gwId} device={device} />;
     default:
-      return (
-        <Typography variant="body2" color="text.secondary">
-          No additional controls for type "{device.type}".
-        </Typography>
-      );
+      return <EntityGroup gwId={gwId} device={device} />;
   }
 }
 

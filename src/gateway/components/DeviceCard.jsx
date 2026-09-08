@@ -6,20 +6,19 @@ import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 import Chip from '@mui/material/Chip';
-import Button from '@mui/material/Button';
 import Switch from '@mui/material/Switch';
 import CircularProgress from '@mui/material/CircularProgress';
-import Tooltip from '@mui/material/Tooltip';
 import { LoginContext } from '../../App';
-import { deviceGet, devicePost } from '../gatewayApi';
+import { deviceGet, setSwitchState } from '../gatewayApi';
 import EntityRow from './EntityRow';
+import EntityGroup from './EntityGroup';
 import { lockVisual, switchVisual, thermostatVisual } from './deviceVisuals';
-
-const stopProp = (e) => e.stopPropagation();
+import { isHAv1, getStatus, getBattery, isMultiEntity } from '../deviceFormat';
 
 // ── Lock (read-only — lock/unlock happens in the detail modal) ────────────────
 function LockStatusRow({ device }) {
-  const { icon, color, label } = lockVisual(device.status);
+  const status = isHAv1(device) ? getStatus(device, 'lock') : device.status;
+  const { icon, color, label } = lockVisual(status);
   return <EntityRow icon={icon} iconColor={color} label="Lock" value={label} />;
 }
 
@@ -27,12 +26,13 @@ function LockStatusRow({ device }) {
 function SwitchStatusRow({ gwId, device }) {
   const [, setLoggedIn] = useContext(LoginContext);
   const queryClient = useQueryClient();
-  const [isOn, setIsOn] = useState(device.status === 'on');
+  const initialStatus = isHAv1(device) ? getStatus(device, 'switch') : device.status;
+  const [isOn, setIsOn] = useState(initialStatus === 'on');
 
   const mutation = useMutation({
-    mutationFn: (value) => devicePost(gwId, device.id, 'switch', { value }, setLoggedIn),
-    onSuccess: (_, value) => {
-      setIsOn(value === 'on');
+    mutationFn: (on) => setSwitchState(gwId, device, on, setLoggedIn),
+    onSuccess: (_, on) => {
+      setIsOn(on);
       queryClient.invalidateQueries({ queryKey: ['gatewaySummary', gwId] });
     },
   });
@@ -50,7 +50,7 @@ function SwitchStatusRow({ gwId, device }) {
         ) : (
           <Switch
             checked={isOn}
-            onChange={(e) => mutation.mutate(e.target.checked ? 'on' : 'off')}
+            onChange={(e) => mutation.mutate(e.target.checked)}
             size="small"
           />
         )
@@ -62,18 +62,23 @@ function SwitchStatusRow({ gwId, device }) {
 // ── Thermostat (read-only — mode/setpoints change in the detail modal) ────────
 function ThermostatStatusRow({ gwId, device }) {
   const [, setLoggedIn] = useContext(LoginContext);
-  const { data: state } = useQuery({
+  const hav1 = isHAv1(device);
+
+  const { data: legacyState } = useQuery({
     queryKey: ['device', gwId, device.id, 'thermostat'],
     queryFn: () => deviceGet(gwId, device.id, 'thermostat', setLoggedIn),
     retry: false,
+    enabled: !hav1,
   });
 
-  const mode = state?.mode ?? null;
+  const mode = hav1 ? getStatus(device, 'climate') : legacyState?.mode ?? null;
+  const heat = hav1 ? getStatus(device, 'heat') ?? getStatus(device, 'temperature') : legacyState?.heat;
+  const cool = hav1 ? getStatus(device, 'cool') : legacyState?.cool;
   const { icon, color } = thermostatVisual(mode);
 
   const setpoints = [
-    state?.heat != null ? `${state.heat}°` : null,
-    state?.cool != null ? `${state.cool}°` : null,
+    heat != null ? `${heat}°` : null,
+    cool != null ? `${cool}°` : null,
   ].filter(Boolean).join(' / ');
 
   return (
@@ -87,42 +92,27 @@ function ThermostatStatusRow({ gwId, device }) {
   );
 }
 
-// ── Sensor (arm/disarm stub) ──────────────────────────────────────────────────
-function SensorQuickActions({ device }) {
-  return (
-    <Stack spacing={1}>
-      {device.status && (
-        <Chip label={device.status} size="small" sx={{ alignSelf: 'flex-start' }} />
-      )}
-      <Stack direction="row" spacing={1} onClick={stopProp}>
-        <Tooltip title="Coming soon">
-          <span>
-            <Button size="small" variant="outlined" color="warning" disabled>Arm</Button>
-          </span>
-        </Tooltip>
-        <Tooltip title="Coming soon">
-          <span>
-            <Button size="small" variant="outlined" disabled>Disarm</Button>
-          </span>
-        </Tooltip>
-      </Stack>
-    </Stack>
-  );
-}
-
 // ── Dispatcher ────────────────────────────────────────────────────────────────
+// A HAv1 device grouping more than one entity of the same kind (e.g. two
+// switches on one physical device) falls through to the generic per-entity
+// renderer regardless of `type`, since the single-widget components below
+// only ever address the first instance.
 function StatusRow({ gwId, device }) {
+  if (isMultiEntity(device)) {
+    return <EntityGroup gwId={gwId} device={device} maxRows={4} />;
+  }
   switch (device.type) {
     case 'lock':       return <LockStatusRow device={device} />;
     case 'switch':     return <SwitchStatusRow gwId={gwId} device={device} />;
     case 'thermostat': return <ThermostatStatusRow gwId={gwId} device={device} />;
-    default:           return <SensorQuickActions device={device} />;
+    default:           return <EntityGroup gwId={gwId} device={device} maxRows={4} />;
   }
 }
 
 // ── Card ──────────────────────────────────────────────────────────────────────
 export default function DeviceCard({ gwId, device, onOpenModal }) {
   const displayName = device.name || device.node || device.id;
+  const battery = getBattery(device);
 
   return (
     <Card
@@ -140,12 +130,12 @@ export default function DeviceCard({ gwId, device, onOpenModal }) {
           <Typography variant="subtitle2" noWrap sx={{ maxWidth: '75%' }}>
             {displayName}
           </Typography>
-          {device.battery != null && (
+          {battery != null && (
             <Chip
-              label={`${device.battery}%`}
+              label={`${battery}%`}
               size="small"
               variant="outlined"
-              color={device.battery < 20 ? 'error' : device.battery < 50 ? 'warning' : 'default'}
+              color={battery < 20 ? 'error' : battery < 50 ? 'warning' : 'default'}
             />
           )}
         </Stack>

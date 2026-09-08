@@ -1,7 +1,17 @@
 import { proxyRequest } from '../api';
+import { isHAv1, resolveAction } from './deviceFormat';
 
 export async function fetchGatewaySummary(gwId, setLoggedIn) {
   const { data } = await proxyRequest({ gwId, path: 'summary', method: 'GET', setLoggedIn });
+  return data;
+}
+
+// One device, in the same shape it has inside fetchGatewaySummary().devices —
+// used to re-read a device's live `status` after a command, HAv1-style
+// (legacy devices keep using their dedicated per-endpoint GETs below, since
+// this summary shape doesn't carry legacy's richer per-command GET payloads).
+export async function fetchDeviceSummary(gwId, deviceId, setLoggedIn) {
+  const { data } = await proxyRequest({ gwId, path: deviceId, method: 'GET', setLoggedIn });
   return data;
 }
 
@@ -27,6 +37,35 @@ export async function devicePost(gwId, deviceId, endpoint, body, setLoggedIn) {
   if (data?.error) throw new Error(data.error);
   return data;
 }
+
+// Format-aware device commands — legacy uses a fixed endpoint + body per
+// type, HAv1 uses a named action (from `device.actions`) with little/no body.
+
+export const setLockState = (gwId, device, locked, setLoggedIn) =>
+  isHAv1(device)
+    ? devicePost(gwId, device.id, resolveAction(device, locked ? 'lock' : 'unlock'), undefined, setLoggedIn)
+    : devicePost(gwId, device.id, 'lock', { value: locked ? 'lock' : 'unlock' }, setLoggedIn);
+
+export const setSwitchState = (gwId, device, on, setLoggedIn) =>
+  isHAv1(device)
+    ? devicePost(gwId, device.id, resolveAction(device, on ? 'turn_on' : 'turn_off'), undefined, setLoggedIn)
+    : devicePost(gwId, device.id, 'switch', { value: on ? 'on' : 'off' }, setLoggedIn);
+
+export const setDimmerLevel = (gwId, device, value, setLoggedIn) =>
+  isHAv1(device)
+    ? devicePost(gwId, device.id, resolveAction(device, 'set_level'), { value }, setLoggedIn)
+    : devicePost(gwId, device.id, 'level', { value }, setLoggedIn);
+
+export const setThermostatMode = (gwId, device, mode, setLoggedIn) =>
+  isHAv1(device)
+    ? devicePost(gwId, device.id, resolveAction(device, 'set_hvac_mode'), { mode }, setLoggedIn)
+    : devicePost(gwId, device.id, 'thermostat', { mode }, setLoggedIn);
+
+// body: { heat: n } and/or { cool: n }
+export const setThermostatSetpoint = (gwId, device, body, setLoggedIn) =>
+  isHAv1(device)
+    ? devicePost(gwId, device.id, resolveAction(device, 'set_temperature'), body, setLoggedIn)
+    : devicePost(gwId, device.id, 'thermostat', body, setLoggedIn);
 
 export async function deviceDelete(gwId, deviceId, endpoint, setLoggedIn) {
   const { data } = await proxyRequest({
