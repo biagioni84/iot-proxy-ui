@@ -10,9 +10,11 @@ import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
+import IconButton from '@mui/material/IconButton';
 import AddIcon from '@mui/icons-material/Add';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { LoginContext } from '../App';
 import { fetchGatewaySummary, refreshZwaveNetwork } from './gatewayApi';
 import DeviceCard from './components/DeviceCard';
@@ -38,7 +40,7 @@ function buildGroups(devices) {
 }
 
 // view: null | 'pairing' | 'sequences'
-export default function DevicesPage({ gwId }) {
+export default function DevicesPage({ gwId, onBack }) {
   const [, setLoggedIn] = useContext(LoginContext);
   const queryClient = useQueryClient();
   const [modalDevice, setModalDevice] = useState(null);
@@ -78,9 +80,18 @@ export default function DevicesPage({ gwId }) {
     <Box>
       {/* Toolbar */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
-        <Typography component="h2" variant="h6">
-          Devices · {data?.gw_id ?? gwId}
-        </Typography>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          {onBack && (
+            <Tooltip title="Back to gateways">
+              <IconButton size="small" onClick={onBack}>
+                <ArrowBackIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          <Typography component="h2" variant="h6">
+            Devices · {data?.gw_id ?? gwId}
+          </Typography>
+        </Stack>
         <Stack direction="row" spacing={1}>
           <Button variant="outlined" size="small" startIcon={<ListAltIcon />} onClick={() => setView('sequences')}>
             Sequences

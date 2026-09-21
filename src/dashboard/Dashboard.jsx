@@ -7,6 +7,7 @@ import Stack from '@mui/material/Stack';
 import AppNavbar from './components/AppNavbar';
 import Header from './components/Header';
 import SummaryPage from './components/SummaryPage';
+import Copyright from './internals/components/Copyright';
 import SideMenu from './components/SideMenu';
 import AppTheme from '../shared-theme/AppTheme';
 import { LoginContext } from '../App';
@@ -72,11 +73,15 @@ export default function Dashboard(props) {
               ? `rgba(${theme.vars.palette.background.defaultChannel} / 1)`
               : alpha(theme.palette.background.default, 1),
             overflow: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: '100vh',
           })}
         >
           <Stack
             spacing={2}
             sx={{
+              flexGrow: 1,
               alignItems: 'center',
               mx: 3,
               pb: 5,
@@ -86,6 +91,7 @@ export default function Dashboard(props) {
             <Header />
             <SummaryPage summary={data}/>
           </Stack>
+          <Copyright sx={{ mb: 2 }} />
         </Box>
       </Box>
     </AppTheme>

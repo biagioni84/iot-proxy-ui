@@ -2,7 +2,6 @@ import * as React from 'react';
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import Copyright from '../internals/components/Copyright';
 import GatewaysList from './GatewaysList';
 import TunnelList from './TunnelList';
 import ProxyPanel from './ProxyPanel';
@@ -17,6 +16,19 @@ export default function SummaryPage(props) {
   const handleGWSelect = (gw, detail) => {
     setSelectedGateway(gw);
     setSelectedDetail(detail);
+  }
+
+  const handleBack = () => {
+    setSelectedGateway('');
+    setSelectedDetail('none');
+  }
+
+  if (selectedDetail === 'devices') {
+    return (
+      <Box sx={{ width: '100%', maxWidth: { sm: '100%', md: '1700px' } }}>
+        <DevicesPage gwId={selectedGateway} onBack={handleBack} />
+      </Box>
+    );
   }
 
   return (
@@ -34,13 +46,7 @@ export default function SummaryPage(props) {
         {selectedDetail === 'proxy' && (
           <ProxyPanel selectedGateway={selectedGateway} />
         )}
-        {selectedDetail === 'devices' && (
-          <Grid size={{ xs: 12 }}>
-            <DevicesPage gwId={selectedGateway} />
-          </Grid>
-        )}
       </Grid>
-      <Copyright sx={{ my: 4 }} />
     </Box>
   );
 }
